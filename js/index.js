@@ -120,6 +120,11 @@ for (const d of delivery) {
   map[d.name] = d.code;
 }
 
+const endWords = [
+  "배송완료",
+  "배달완료"
+]
+
 document.addEventListener('DOMContentLoaded', function() {
   var accordionItems = document.querySelectorAll('.accordion-item');
 
@@ -139,15 +144,14 @@ let sheetName;
 
 function readExcel() {
   let input = event.target;
+  if(input === undefined) return;
   let reader = new FileReader();
   reader.onload = function () {
     let data = reader.result;
     let workBook = XLSX.read(data, { type: 'binary' });
-    workBook.SheetNames.forEach(function (sheetName) {
-      sheetName = sheetName;
-      rows = XLSX.utils.sheet_to_json(workBook.Sheets[sheetName]);
-      console.log(JSON.stringify(rows));
-    })
+    const sheet = workBook.SheetNames[0];
+    this.sheetName = sheet;
+    rows = XLSX.utils.sheet_to_json(workBook.Sheets[sheet]);
   };
   reader.readAsBinaryString(input.files[0]);
 }
@@ -157,7 +161,7 @@ function onChangeKey(key) {
 }
 
 async function call(code, invoice) {
-  const response = await fetch(`https://s.search.naver.com/n/csearch/ocontent/util/headerjson.naver?callapi=parceltracking&t_code=${code}&t_invoice=${invoice}&passportKey=${passportKey}`, {
+  const response = await fetch(`https://s.search.naver.com/n/csearch/ocontent/util/headerjson.naver?callapi=parceltracking&t_code=${code}&t_invoice=${invoice}&passportKey=${encodeURIComponent(passportKey)}`, {
     method: 'GET'
   })
   const data = await response.json();
@@ -188,6 +192,72 @@ function exportExcel(excelHandler) {
   saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), excelHandler.getExcelFileName());
 }
 
+function convertTimestampToKoreanTime(timestamp) {
+  // 타임스탬프를 milliseconds 단위로 변환
+  const date = new Date(timestamp);
+
+  // 한국 시간으로 설정
+  date.setUTCHours(date.getUTCHours() + 9);
+
+  // 날짜 및 시간을 원하는 형식으로 포맷
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  // 포맷된 문자열 반환
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function convertTimestampToKoreanYMD(timestamp) {
+  // 타임스탬프를 milliseconds 단위로 변환
+  const date = new Date(timestamp);
+
+  // 한국 시간으로 설정
+  date.setUTCHours(date.getUTCHours() + 9);
+
+  // 날짜 및 시간을 원하는 형식으로 포맷
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+
+  // 포맷된 문자열 반환
+  return [year, month, day];
+}
+
+function calculateDayDifference(timestamp1, timestamp2) {
+  // 타임스탬프를 milliseconds 단위로 변환하여 Date 객체 생성
+  const date1 = new Date(timestamp1);
+  const date2 = new Date(timestamp2);
+
+  date1.setUTCHours(date1.getUTCHours() + 9);
+  date2.setUTCHours(date2.getUTCHours() + 9);
+
+  // 날짜 사이의 밀리초 차이 계산
+  const differenceMs = Math.abs(date1 - date2);
+  // 일로 변환
+  const differenceDays = differenceMs / (1000 * 60 * 60 * 24);
+
+  let day = Math.floor(differenceDays);
+
+  // diffDays에 소수점이 있다면
+  if(!Number.isInteger(differenceDays)) {
+    const ymd1 = convertTimestampToKoreanYMD(date1);
+    const ymd2 = convertTimestampToKoreanYMD(date2);
+    if(
+      ymd2[0] > ymd1[0] // 해가 넘어갔거나
+      || (ymd2[0] === ymd1[0] && ymd2[1] > ymd1[1]) // 해는 같은데 달이 넘어갔거나
+      ||  (ymd2[0] === ymd1[0] && ymd2[1] === ymd1[1] && ymd2[2] > ymd1[2]) // 해, 달이 같은데 일이 넘어간 경우
+      ) {
+        day++;
+    }
+  }
+  // 결과 반환
+  return day; // 소수점 이하는 버림
+}
+
 async function onclickbutton() {
   if (rows == undefined) {
     alert("파일을 추가해주세요.")
@@ -200,17 +270,34 @@ async function onclickbutton() {
   }
 
   const data = [
-    ['택배사', '송장번호', '상태']
+    ['택배사', '운송장 번호', '배송 상태', '현재 위치', '배송 시작일', '배송 완료일', '총 걸린 일수']
   ];
 
   for (const row of rows) {
     const company = row['택배사'];
-    const invoice = row['송장번호'];
+    const invoice = row['운송장 번호 - 없이 입력'];
 
     const d = await call(map[company], invoice);
-    const lastDetail = d.lastDetail.kind;
-
-    data.push([company, invoice, lastDetail])
+    if(d && d.message && d.message.error) {
+      alert(d.message.error);
+      return;
+    }
+    
+    if(d && d.tracking_info && d.tracking_info.ErrorMsg) {
+      if(d.tracking_info.ErrorCode === "109") {
+        isBlock = true;
+        alert("ip가 Block되었습니다. 다른 ip로 이어서 작업해 주세요.");
+        break;
+      }
+      data.push([company, invoice, d.tracking_info.ErrorMsg])
+    } else {
+      const lastDetail = d.lastDetail.kind;
+      const nowPosition = d.lastDetail.where;
+      const firstTime = convertTimestampToKoreanTime(d.firstDetail.time);
+      const lastTime = lastDetail.includes("완료") ? convertTimestampToKoreanTime(d.lastDetail.time) : "";
+      const diffDay = lastDetail.includes("완료") ? calculateDayDifference(d.firstDetail.time, d.lastDetail.time) : "";
+      data.push([company, invoice, lastDetail, nowPosition, firstTime, lastTime, diffDay])
+    }
   }
 
   const excelHandler = {
