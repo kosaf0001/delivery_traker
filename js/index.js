@@ -1,3 +1,26 @@
+const url = 'https://search.naver.com/search.naver?query=%EB%84%A4%EC%9D%B4%EB%B2%84+%ED%83%9D%EB%B0%B0';
+
+let rows;
+let passportKey = '';
+let sheetName;
+
+const getPassportKey = async () => {
+  const response = await fetch(url);
+  const data = await response.text();
+  let startIndex = data.indexOf('\"passportKey\": \"') + '\"passportKey\": \"'.length;
+  if(startIndex == 15) {
+    startIndex = data.indexOf('\"passportKey\":\"') + '\"passportKey\":\"'.length;
+  }
+  let endIndex = data.indexOf('%3D\"', startIndex);
+  passportKey = data.substring(startIndex, endIndex);
+  passportKey = decodeURIComponent(passportKey);
+}
+
+const visibleLoading = (isShow) => {
+  const loading_img = document.getElementById('loading_img');
+  loading_img.style.display = isShow ? 'block' : 'none';
+}
+
 const delivery = [
   { code: "04", name: "CJ대한통운" },
   { code: "01", name: "우체국택배" },
@@ -125,29 +148,27 @@ const endWords = [
   "배달완료"
 ]
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   var accordionItems = document.querySelectorAll('.accordion-item');
 
-  accordionItems.forEach(function(item) {
-      var header = item.querySelector('.accordion-header');
-      var content = item.querySelector('.accordion-content');
+  accordionItems.forEach(function (item) {
+    var header = item.querySelector('.accordion-header');
+    var content = item.querySelector('.accordion-content');
 
-      header.addEventListener('click', function() {
-          content.classList.toggle('active');
-      });
+    header.addEventListener('click', function () {
+      content.classList.toggle('active');
+    });
   });
 });
 
-let rows; 
-let passportKey = '';
-let sheetName;
+
 
 function readExcel() {
   let input = event.target;
-  if(input === undefined) return;
+  if (input === undefined) return;
   let reader = new FileReader();
   reader.onload = function () {
-    let data = reader.result;
+    let data = reader.result; 
     let workBook = XLSX.read(data, { type: 'binary' });
     const sheet = workBook.SheetNames[0];
     this.sheetName = sheet;
@@ -156,15 +177,16 @@ function readExcel() {
   reader.readAsBinaryString(input.files[0]);
 }
 
-function onChangeKey(key) {
-  passportKey = key;
-}
-
 async function call(code, invoice) {
+  if (passportKey === '') {
+    await getPassportKey();
+  }
+
   const response = await fetch(`https://s.search.naver.com/n/csearch/ocontent/util/headerjson.naver?callapi=parceltracking&t_code=${code}&t_invoice=${invoice}&passportKey=${encodeURIComponent(passportKey)}`, {
     method: 'GET'
   })
   const data = await response.json();
+
   return data;
 }
 
@@ -243,15 +265,15 @@ function calculateDayDifference(timestamp1, timestamp2) {
   let day = Math.floor(differenceDays);
 
   // diffDays에 소수점이 있다면
-  if(!Number.isInteger(differenceDays)) {
+  if (!Number.isInteger(differenceDays)) {
     const ymd1 = convertTimestampToKoreanYMD(date1);
     const ymd2 = convertTimestampToKoreanYMD(date2);
-    if(
+    if (
       ymd2[0] > ymd1[0] // 해가 넘어갔거나
       || (ymd2[0] === ymd1[0] && ymd2[1] > ymd1[1]) // 해는 같은데 달이 넘어갔거나
-      ||  (ymd2[0] === ymd1[0] && ymd2[1] === ymd1[1] && ymd2[2] > ymd1[2]) // 해, 달이 같은데 일이 넘어간 경우
-      ) {
-        day++;
+      || (ymd2[0] === ymd1[0] && ymd2[1] === ymd1[1] && ymd2[2] > ymd1[2]) // 해, 달이 같은데 일이 넘어간 경우
+    ) {
+      day++;
     }
   }
   // 결과 반환
@@ -264,10 +286,7 @@ async function onclickbutton() {
     return;
   }
 
-  if (passportKey === '') {
-    alert("passportKey를 추가하세요.");
-    return;
-  }
+  visibleLoading(true);
 
   const data = [
     ['택배사', '운송장 번호', '배송 상태', '현재 위치', '배송 시작일', '배송 완료일', '총 걸린 일수']
@@ -277,14 +296,25 @@ async function onclickbutton() {
     const company = row['택배사'];
     const invoice = row['운송장 번호 - 없이 입력'];
 
-    const d = await call(map[company], invoice);
-    if(d && d.message && d.message.error) {
-      alert(d.message.error);
-      return;
+    let d = await call(map[company], invoice);
+    if (d && d.message && d.message.error) {
+      if (d.message.error === '유효한 키가 아닙니다.') {
+        passportKey = '';
+        d = await call(map[company], invoice);
+        if (d && d.message && d.message.error) {
+          alert(d.message.error);
+          visibleLoading(false);
+          return;
+        }
+      } else {
+        alert(d.message.error);
+        visibleLoading(false);
+        return;
+      }
     }
-    
-    if(d && d.tracking_info && d.tracking_info.ErrorMsg) {
-      if(d.tracking_info.ErrorCode === "109") {
+
+    if (d && d.tracking_info && d.tracking_info.ErrorMsg) {
+      if (d.tracking_info.ErrorCode === "109") {
         isBlock = true;
         alert("ip가 Block되었습니다. 다른 ip로 이어서 작업해 주세요.");
         break;
@@ -315,4 +345,5 @@ async function onclickbutton() {
     }
   }
   exportExcel(excelHandler);
+  visibleLoading(false);
 }

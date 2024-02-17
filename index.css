@@ -1,0 +1,124 @@
+    a {
+      display: inline-block;
+      color: #007bff;
+      /* Link color */
+      text-decoration: none;
+      /* Remove default underline */
+      padding: 5px 10px;
+      /* Add padding to create clickable area */
+      border: 1px solid #007bff;
+      /* Add border */
+      border-radius: 5px;
+      /* Add rounded corners */
+      background-color: #ffffff;
+      /* Background color */
+      transition: all 0.3s ease;
+      /* Add smooth transition */
+      width: 200px;
+      text-align: center;
+    }
+
+    a:hover {
+      background-color: #007bff;
+      /* Change background color on hover */
+      color: #ffffff;
+      /* Change text color on hover */
+    }
+
+    input[type="text"] {
+      display: inline-block;
+      padding: 5px 10px;
+      /* Add padding to create space around the text */
+      border: 1px solid #ced4da;
+      /* Add border */
+      border-radius: 5px;
+      /* Add rounded corners */
+      background-color: #ffffff;
+      /* Background color */
+      transition: border-color 0.3s ease;
+      /* Add smooth transition */
+      width: 200px;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      /* Remove default focus outline */
+      border-color: #007bff;
+      /* Change border color on focus */
+    }
+
+    button {
+      display: inline-block;
+      padding: 8px 16px;
+      /* Add padding to create space around the text */
+      border: 1px solid #007bff;
+      /* Add border */
+      border-radius: 5px;
+      /* Add rounded corners */
+      background-color: #007bff;
+      /* Background color */
+      color: #ffffff;
+      /* Text color */
+      cursor: pointer;
+      /* Change cursor to pointer on hover */
+      transition: all 0.3s ease;
+      /* Add smooth transition */
+      width: 222px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+      /* Change background color on hover */
+      border-color: #0056b3;
+      /* Change border color on hover */
+    }
+
+    button:focus {
+      outline: none;
+      /* Remove default focus outline */
+    }
+
+    input[type="file"] {
+      display: inline-block;
+      padding: 8px 16px;
+      /* Add padding to create space around the text */
+      border: 1px solid #ced4da;
+      /* Add border */
+      border-radius: 5px;
+      /* Add rounded corners */
+      background-color: #ffffff;
+      /* Background color */
+      color: #495057;
+      /* Text color */
+      cursor: pointer;
+      /* Change cursor to pointer on hover */
+      transition: all 0.3s ease;
+      /* Add smooth transition */
+      box-sizing: border-box;
+      /* Include padding and border in the width */
+      width: 222px;
+    }
+
+    input[type="file"]:hover {
+      background-color: #f8f9fa;
+      /* Change background color on hover */
+      border-color: #ced4da;
+      /* Change border color on hover */
+    }
+
+    input[type="file"]:focus {
+      outline: none;
+      /* Remove default focus outline */
+      border-color: #007bff;
+      /* Change border color on focus */
+    }
+
+    img {
+      width: 1000px;
+    }
+
+    #loading_img {
+      display: none;
+      width: 50px;
+      height: 50px;
+    }
